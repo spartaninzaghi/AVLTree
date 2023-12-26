@@ -112,19 +112,24 @@ class BinarySearchTree:
 
     def height(self, root: Node) -> int:
         """
-        Returns the height of the binary search tree
+        Get the height of the node, `root`
         :param root: The root node of the BST
+        :return: The height of `root`
         """
         # Null parent has -1 height
         if root is None:
             return -1
+        return root.height
 
-        elif root.left is None and root.right is None:
-            return 0
-
-        else:
-            return 1 + max(self.height(root.left), self.height(root.right))
-
+    def max(self, root: Node) -> Optional[Node]:
+        """
+        Return the node containing the maximum value in the BST
+        :param root: The subtree whose maximum node is to be determined
+        :return: The root of the the resulting subtree post removal
+        """
+        if root and root.right:
+            return self.max(root.right)
+        return root
 
     def insert(self, root: Node, val: T) -> None:
         """
@@ -133,48 +138,39 @@ class BinarySearchTree:
 
         :param root: The root of the subtree where the value is to be inserted
         :param val: The value to insert
+        :return: None
         """
-        def update_heights(node: Node) -> None:
-            """
-            Inner helper function that updates the heights of all ancestors
-            of `root` after insertion
-            :param node: The root of the subtree where the value is to be inserted
-            """
-            # Base case
-            if node.parent is None:
-                self.origin.height = self.height(self.origin)
-                return
-
-            # Recursion
-            node.height = self.height(node)
-            return update_heights(node.parent)
-
         #  -------- Case 0 : Value becomes root of empty BST --------
         if root is None:
             self.origin = Node(val)
             self.size += 1
             return
 
-        # Prep : Employ Search to find potential parent recursively
-        parent = self.search(root, val)
+        # ----- Case 1A : Value becomes left child of parent ------
+        if val < root.value:
+            if root.left is None:
+                root.left = Node(val, root)
+                self.size += 1
+            else:
+                self.insert(root.left, val)
 
-        # ------ Case 1 : Value is already in BST, do Nothing ------
-        if val == parent.value:
-            return
+        # ----- Case 1B : Value becomes right child of parent -----
+        elif val > root.value:
+            if root.right is None:
+                root.right = Node(val, root)
+                self.size += 1
+            else:
+                self.insert(root.right, val)
 
-        # ----- Case 2A : Value becomes left child of parent ------
-        if val < parent.value:
-            parent.left = Node(val, parent)
-            if parent.right is None:
-                update_heights(parent)
-            self.size += 1
-
-        # ----- Case 2B : Value becomes right child of parent -----
+        # Case 2: Value already in BST, do nothing
         else:
-            parent.right = Node(val, parent)
-            if parent.left is None:
-                update_heights(parent)
-            self.size += 1
+            return None
+
+        # Adjust the node height to the new max value
+        root.height = 1 + max(self.height(root.left), self.height(root.right))
+
+        # Adjust the origin height to its new max value
+        self.origin.height = 1 + max(self.height(self.origin.left), self.height(self.origin.right))
 
     def remove(self, root: Node, val: T) -> Optional[Node]:
         """
@@ -183,98 +179,43 @@ class BinarySearchTree:
 
         :param root: The root of the subtree where the value is to be removed
         :param val: The value to remove
+        :return: The root of the the resulting subtree post removal
         """
-        def update_heights(node: Node) -> None:
-            """
-            Inner helper function that updates the heights of all ancestors
-            of `root` after insertion
-            :param node: The root of the subtree where the value is to be inserted
-            """
-            # Base Case
-            if node.parent is None:
-                self.origin.height = self.height(self.origin) - 1 \
-                                     if self.height(self.origin) != 0 else 0
-                return
-
-            # Recursion
-            node.height = self.height(node) - 1 if self.height(node) != -1 else -1
-            return update_heights(node.parent)
-
-        def min_node(node : Node) -> Optional[Node]:
-            """
-            Gets the node with the smallest value of the BST
-
-            :param node: root of subtree for finding the node with the minimum
-            :return: node with minimum value
-            """
-            if node is None:
-                return None
-
-            while node.left is not None:
-                node = node.left
-            return node
-
-        found_node = self.search(self.origin, val)
-
-        # ----------- Ignore Unsuccessful Search ----------
+        found_node = self.search(root, val)
+        # ------------  CASE 0 : Unsuccessful Search ------------
         if found_node is None or found_node.value != val:
-            return
-
-        # -------- Search Successful : Delete Node --------
-
-        #
-        # CASE 1 : Leaf Node
-        #
-        if found_node.right is None and found_node.left is None:
+            pass # do nothing
+        # ---------------- CASE 1 : Leaf Node -------------------
+        elif found_node.right is None and found_node.left is None:
             par = found_node.parent
-
-            # Update parent
-            # ---------- Case 1A : found_node was root ----------
+            # Update parent (reset origin if parent is origin & update parent's L/R child)
             if par is None:
                 self.origin = None
-            # ------- Case 1B : found_node was right child -------
-            elif par.right is not None and par.right.value == val:
+            elif par.right and par.right.value == val:
                 par.right = None
-
-            # ------- Case 1C : found_node was left child --------
             else:
                 par.left = None
             self.size -= 1
-            return
-
-        #
-        # CASE 2 : One Child
-        #
-        if found_node.right is None or found_node.left is None:
+            par.height = 1 + max(self.height(par.left), self.height(par.right))
+        # ---------------- CASE 2 : One Child -----------------
+        elif found_node.right is None or found_node.left is None:
             par = found_node.parent
-            if found_node.right is not None:
-                child = found_node.right
-            else:
-                child = found_node.left
-
+            child = found_node.right if found_node.right else found_node.left
             # Update parent (promote single child to position of current node)
             if par is None:
-                # Special case if found_node was root
                 self.origin = child
-            elif par.right is not None and par.right.value == val:
+            elif par.right and par.right.value == val:
                 par.right = child
             else:
                 par.left = child
-            # Update child (promote single child)
-            child.parent = par
+            child.parent = par # Update child (promote single child)
             self.size -= 1
-            return
-
-        #
-        # CASE 3 : Two children (else)
-        #
-        # Find Successor : Minimum right subtree node
-        min_right_subtree = min_node(found_node.right)
-
-        # Temporarily Remove Successor from BST (before inserting in new position)
-        self.remove(min_right_subtree, val)
-        found_node.value = min_right_subtree.value
-
+            par.height = 1 + max(self.height(par.left), self.height(par.right))
+        # -------------- CASE 3 : Two children (else) -------------
+        else:
+            successor = self.max(found_node.left)   # Successor is max node in its left subtree.
+            self.remove(successor, successor.value) # Temporarily Remove Successor from BST
+            found_node.value = successor.value      # placing it at the position of the root
 
 
     def search(self, root: Node, val: T) -> Optional[Node]:
@@ -285,27 +226,23 @@ class BinarySearchTree:
 
         :param root: The root of the subtree in which to search for `val`
         :param val: The value to search for
+        :return: The node containing `val` if found else potential parent
         """
-        # Case 0 : -------------- Empty BST ---------------
-        if root is None:
-            return None
+        # Case 0 : ------- Empty BST or Value Found --------
+        if root is None or val == root.value:
+            return root
 
         # Case 1A : --------- Recurse left subtree ---------
-        elif val < root.value:
+        if val < root.value:
             if root.left:  # root has left subtree
                 return self.search(root.left, val)
             return root  # root lacks left subtree
 
         # Case 1B : --------- Recurse Right Subtree --------
-        elif val > root.value:
+        else:
             if root.right:  # root has left subtree
                 return self.search(root.right, val)
             return root  # root lacks right subtree
-
-        # Case 2 : -------------- Value Found --------------
-        else:
-            return root
-
 
 
 
@@ -361,102 +298,338 @@ class AVLTree:
 
     def height(self, root: Node) -> int:
         """
-        Returns the height of the AVL
+        Get the height of the node, `root`
         :param root: The root node of the AVL
+        :return: The height of `root`
         """
         # Null parent has -1 height
         if root is None:
             return -1
-
-        elif root.left is None and root.right is None:
-            return 0
-
-        else:
-            return 1 + max(self.height(root.left), self.height(root.right))
+        return root.height
 
     def left_rotate(self, root: Node) -> Optional[Node]:
         """
-
+        Rotate a right-right (RR) imbalanced subtree to the left
+        :param root: The subtree to left rotate
+        :return: The root of the left rotated subtree
         """
-        pass
+        # Left rotation successor : Right child of unbalanced node
+        successor = root.right if root else None
+        sacrifice = successor.left if successor else None
+
+        # If the unbalanced node has a valid right child to succeed it
+        if successor:
+            # Successor takes root's place
+            successor.parent = root.parent
+
+            # If root is not the origin
+            if root.parent:
+                if root is root.parent.left:
+                    root.parent.left = successor  # make successor left child of root's parent
+                else:
+                    root.parent.right = successor # make successor right child of root's parent
+            else:
+                self.origin = successor
+
+            # Demote the unbalanced root to be successor's left child
+            root.parent = successor
+            successor.left = root
+
+            # Give the successor's left child to the demoted root as its right child
+            root.right = sacrifice
+            if sacrifice:
+                sacrifice.parent = root
+
+            # # update root as the successor
+            # root = successor
+
+            # Adjust the node height to the new max value
+            root.height = 1 + max(self.height(root.left), self.height(root.right))
+
+            # Adjust the origin height to its new max value
+            successor.height = 1 + max(self.height(successor.left), self.height(successor.right))
+            return successor
+
+        return root
 
     def right_rotate(self, root: Node) -> Optional[Node]:
         """
-        INSERT DOCSTRING HERE
+        Rotate a left-left (LL) imbalanced subtree to the right
+        :param root: The subtree to right rotate
+        :return: The root of the right rotated subtree
         """
-        pass
+        # Right rotation successor : Left child of unbalanced node
+        successor = root.left if root else None
+        sacrifice = successor.right if successor else None
+
+        if successor:
+            # Successor takes root's place
+            successor.parent = root.parent
+
+            # Root is not origin
+            if root.parent:
+                # Root is left child of its parent
+                if root is root.parent.left:
+                    root.parent.left = successor  # make successor left child of root's parent
+                else:
+                    root.parent.right = successor # make successor right child of root's parent
+            else:
+                self.origin = successor
+
+            # Demote root to be successor's right child
+            root.parent = successor
+            successor.right = root
+
+            # Give the successor's right child to the demoted root as its left child
+            root.left = sacrifice
+            if sacrifice:
+                sacrifice.parent = root
+
+            # # update root as the successor
+            # root = successor
+
+            # Adjust the node height to the new max value
+            root.height = 1 + max(self.height(root.left), self.height(root.right))
+
+            # Adjust the origin height to its new max value
+            successor.height = 1 + max(self.height(successor.left), self.height(successor.right))
+            return successor
+
+        return root
 
     def balance_factor(self, root: Node) -> int:
         """
-        INSERT DOCSTRING HERE
+        Determine the balace factor of `root`, given by the height of its
+        left subtree minus the height of its right subtree
+        :param root: The node whose balance factor is to be determined
+        :return: An integer representing the balance factor of `root`
         """
-        pass
+        return self.height(root.left) - self.height(root.right) if root else 0
 
     def rebalance(self, root: Node) -> Optional[Node]:
         """
-        INSERT DOCSTRING HERE
+        Perform appropriate appropriate rotations to balance `root`
+        if it exhibits LL, RR, LR, or RL imbalance
+        :param root: The node to rebalance
+        :return: The root the new, potentially rebalanced subtree
         """
-        pass
+        # Case 0
+        if -1 <= self.balance_factor(root) <= 1:
+            return root
+
+        # CASE 1 | LL : Right Rotation to balance
+        if self.balance_factor(root) > 1:
+            if self.balance_factor(root.left) <= -1:
+                root_of_1st_rot = self.left_rotate(root.left) # CASE 3 | LR 2X Rotation
+                return self.right_rotate(root_of_1st_rot.parent)
+            return self.right_rotate(root)
+
+        # CASE 2 | RR: Left Rotation to balance
+        elif self.balance_factor(root) < -1:
+            if self.balance_factor(root.right) >= 1:
+                root_of_1st_rot = self.right_rotate(root.right) # CASE 4 | RL 2X Rotation
+                return self.left_rotate(root_of_1st_rot.parent)
+            return self.left_rotate(root)
 
     def insert(self, root: Node, val: T) -> Optional[Node]:
         """
-        INSERT DOCSTRING HERE
+        Inserts a node with the value `val` into the subtree rooted at
+        root & returns the root of the balanced subtree after the insertion
+
+        :param root: The root of the subtree where the value is to be inserted
+        :param val: The value to insert
+        :return: The root of the balanced subtree post insertion
         """
-        pass
+        #  -------- Case 0 : Value becomes root of empty BST --------
+        if root is None:
+            self.origin = Node(val)
+            self.size += 1
+            return self.origin
+
+        # ----- Case 1A : Value becomes left child of parent ------
+        elif val < root.value:
+            if root.left is None:
+                root.left = Node(val, root)
+                self.size += 1
+            else:
+                self.insert(root.left, val) # recurse left subtree of root
+
+        # ----- Case 1B : Value becomes right child of parent -----
+        elif val > root.value:
+            if root.right is None:
+                root.right = Node(val, root)
+                self.size += 1
+            else:
+                self.insert(root.right, val) # recurse right subtree of root
+
+        # Case 2: Value already in BST, do nothing
+        else:
+            pass
+
+        # Adjust the node height to its new max value
+        root.height = 1 + max(self.height(root.left), self.height(root.right))
+
+        # Adjust the origin height to its new max value
+        self.origin.height = 1 + max(self.height(self.origin.left), self.height(self.origin.right))
+
+        return self.rebalance(root)
 
     def remove(self, root: Node, val: T) -> Optional[Node]:
         """
-        INSERT DOCSTRING HERE
+        Removes the node containing the specified value from the subtree
+        rooted at `root`, balances the subtree as needed, and returns the
+        root of the resulting subtree post removal
+
+        :param root: The root of the subtree where the value is to be removed
+        :param val: The value to remove
+        :return: The root of the the resulting subtree post removal
         """
-        pass
+        if root is None:  # Leaf reached
+            return None
+        elif val < root.value:  # Value in left subtree
+            root.left = self.remove(root.left, val)
+        elif val > root.value:  # Value in right subtree
+            root.right = self.remove(root.right, val)
+        else:
+            # Value found : Delete it
+            if root.left is None:
+                if root.parent is None:  # update origin
+                    self.origin = root.right
+                if root.right is not None:  # update right child as parent
+                    root.right.parent = root.parent
+                self.size -= 1
+                return root.right
+            elif root.right is None:
+                if root.parent is None:  # update origin
+                    self.origin = root.left
+                if root.left is not None:  # update left child as parent
+                    root.left.parent = root.parent
+                self.size -= 1
+                return root.left
+            else:
+                # two children: swap with predecessor and delete predecessor
+                predecessor = self.max(root.left)
+                root.value = predecessor.value
+                root.left = self.remove(root.left, predecessor.value)
+
+        # update height and rebalance every node that was traversed in recursive deletion
+        root.height = 1 + max(self.height(root.left), self.height(root.right))
+        return self.rebalance(root)
 
     def min(self, root: Node) -> Optional[Node]:
         """
-        INSERT DOCSTRING HERE
+        Return the node containing the minimum value in the AVL
+        :param root: The subtree whose minimum is to be determined
+        :return: The node with the minimum value in the AVL
         """
-        pass
+        if root and root.left:
+            return self.min(root.left)
+        return root
 
     def max(self, root: Node) -> Optional[Node]:
         """
-        INSERT DOCSTRING HERE
+        Return the node containing the maximum value in the AVL
+        :param root: The subtree whose maximum node is to be determined
+        :return: The node with the maximum value in the AVL
         """
-        pass
+        if root and root.right:
+            return self.max(root.right)
+        return root
 
     def search(self, root: Node, val: T) -> Optional[Node]:
         """
-        INSERT DOCSTRING HERE
+        Searches for and returns the node containing the value `val`
+        in the subtree rooted at `root`. If `val` is not found in the
+        subtree, the potential parent of `val` is returned
+
+        :param root: The root of the subtree in which to search for `val`
+        :param val: The value to search for
+        :return: The node containing `val` if found else potential parent
         """
-        pass
+        # Case 0 : ------- Empty BST or Value Found --------
+        if root is None or val == root.value:
+            return root
+
+        # Case 1A : --------- Recurse left subtree ---------
+        if val < root.value:
+            if root.left:  # root has left subtree
+                return self.search(root.left, val)
+            return root  # root lacks left subtree
+
+        # Case 1B : --------- Recurse Right Subtree --------
+        else:
+            if root.right:  # root has left subtree
+                return self.search(root.right, val)
+            return root  # root lacks right subtree
 
     def inorder(self, root: Node) -> Generator[Node, None, None]:
         """
-        INSERT DOCSTRING HERE
+        perform an inorder traversal (left, current, right) of the subtree
+        rooted at `root`, generating the nodes one at a time using a Python
+        generator
+        :param root: The root of the subtree to traverse
+        :return: An inorder generator
         """
-        pass
+        if root is not None:
+            yield from self.inorder(root.left)
+            yield root
+            yield from self.inorder(root.right)
 
     def __iter__(self) -> Generator[Node, None, None]:
         """
-        INSERT DOCSTRING HERE
+        Make the AVL tree iterable
+        :return: A generator to enable iteration
         """
-        pass
+        yield from self.inorder(self.origin)
 
     def preorder(self, root: Node) -> Generator[Node, None, None]:
         """
-        INSERT DOCSTRING HERE
+        Perform a preorder traversal (current, left, right) of the subtree
+        rooted at `root`, generating the nodes one at a time using a Python
+        generator
+        :param root: The root of the subtree to traverse
+        :return: A pre order generator
         """
-        pass
+        if root:
+            yield root
+            yield from self.preorder(root.left)
+            yield from self.preorder(root.right)
 
     def postorder(self, root: Node) -> Generator[Node, None, None]:
         """
-        INSERT DOCSTRING HERE
+        Perform a postorder traversal (left, right, current) of the subtree
+        rooted at `root`, generating the nodes one at a time using a Python
+        generator
+        :param root: The root of the subtree to traverse
+        :return: A post order generator
         """
-        pass
+        if root:
+            yield from self.postorder(root.left)
+            yield from self.postorder(root.right)
+            yield root
+
 
     def levelorder(self, root: Node) -> Generator[Node, None, None]:
         """
-        INSERT DOCSTRING HERE
+        Perform a level-order (breadth-first) traversal of the subtree
+        rooted at `root`, generating the nodes one at a time using a
+        Python generator
+        :param root: The root of the subtree to traverse
+        :return: A level order generator
         """
-        pass
+        if root is None:
+            return
+
+        sq = SimpleQueue()
+        sq.put(root)
+
+        while not sq.empty():
+            curr = sq.get()
+
+            if curr:
+                yield curr
+                sq.put(curr.left)
+                sq.put(curr.right)
 
 
 ####################################################################################################
@@ -578,17 +751,94 @@ class NearestNeighborClassifier:
     # Implement functions below this line. #
     ########################################
 
+    def key(self, k: float) -> float:
+        """
+        Generate a valid key that can be wrapped in an AVLWrappedDictionary
+        and searched for in the NNC's AVL tree. The valid key is rounded to
+        the precision specified by the resolution
+        :param k: The key to round
+        :return: The key rounded to precision of the resolution
+        """
+        return round(k, self.resolution)
+
+    def feature(self, k: float) -> AVLWrappedDictionary:
+        """
+        Generate a valid feature key that can be searched for in the NNC's AVL tree
+        :param k: The key that owns the generated AVLWrappedDictionary feature
+        :return: `k` wrapped in an AVLWrappedDictionary
+        """
+        return AVLWrappedDictionary(key=self.key(k))
+
+    def get_valid_keys(self, x: float, delta: float) -> set[float]:
+        """
+        Generate a set of keys that are within the range of `± delta` of `x`
+        :param x: The feature key to train the NNC model on
+        :return: A set of keys that are valid neighbors or `x`
+        """
+        return { self.key(x) + delta * i for i in range(-1, 2)
+                 if 0 <= self.key(x) + delta * i <= 1 } # Set eliminates duplicate keys
+
+
     def fit(self, data: List[Tuple[float, str]]) -> None:
         """
-        INSERT DOCSTRING HERE
+        Train the NNC's AVL tree using a training dataset of  `(x,y)` pairs, where `x`
+        is a feature and `y` is the target label.
+        :param data: The training data as a list of `(feature, label)` or `(x,y)` pairs
+        :return: None
         """
-        pass
+        for x, y in data:
+            labels = self.tree.search(self.tree.origin, self.feature(x)).value
+            if labels.key != self.key(x) : continue
+            labels.dictionary[y] = labels.dictionary[y] + 1 if y in labels.dictionary else 1
+
 
     def predict(self, x: float, delta: float) -> str:
         """
-        INSERT DOCSTRING HERE
+        Predict the modal (most frequent) label for a testing  dataset of `x` values based
+        on the patterns learned during the training phase using the `fit()` method of the NNC
+        :param x: The feature key to train the NNC model on
+        :param delta: The allowable distance of `x'`s neighbors away from x in the NNC's AVL tree
+        :return: The modal (most frequent) label
         """
-        pass
+        counts = {}                                    # Because of x+delta, x, x-delta the
+        for neighbor in self.get_valid_keys(x, delta): # for loop only ever iterates up to 3 times
+            labels = self.tree.search(self.tree.origin, self.feature(neighbor)).value # O(logn)
+            if labels.key != self.key(neighbor):
+                continue
+            for y in labels.dictionary:
+                counts[y] = counts[y] + labels.dictionary[y] if y in counts else labels.dictionary[y]
+        return max(counts, key=counts.get) if counts else None  # same runtime as using for loop for max
+
+        # l = self.key(x) - delta
+        # m = self.key(x)
+        # h = self.key(x) + delta
+        #
+        # low_neighbor = self.tree.search(self.tree.origin, self.feature(l)).value if 0 <= l <= 1 else None
+        # mid_neighbor = self.tree.search(self.tree.origin, self.feature(m)).value if 0 <= m <= 1 else None
+        # hgh_neighbor = self.tree.search(self.tree.origin, self.feature(h)).value if 0 <= h <= 1 else None
+        #
+        # if low_neighbor:
+        #     for y in low_neighbor.dictionary:
+        #         if y in counts:
+        #             counts[y] += low_neighbor.dictionary[y]
+        #         else:
+        #             counts[y] = low_neighbor.dictionary[y]
+        #
+        # if mid_neighbor:
+        #     for y in mid_neighbor.dictionary:
+        #         if y in counts:
+        #             counts[y] += mid_neighbor.dictionary[y]
+        #         else:
+        #             counts[y] = mid_neighbor.dictionary[y]
+        #
+        # if hgh_neighbor:
+        #     for y in hgh_neighbor.dictionary:
+        #         if y in counts:
+        #             counts[y] += hgh_neighbor.dictionary[y]
+        #         else:
+        #             counts[y] = hgh_neighbor.dictionary[y]
+        # return max(counts, key=counts.get) if counts else None  # same runtime as using for loop for max
+
 
 ####################################################################################################
 
